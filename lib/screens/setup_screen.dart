@@ -404,7 +404,7 @@ class _SetupScreenState extends State<SetupScreen> {
                                   color: theme.colorScheme.primary.withOpacity(0.1),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
-                                child: FaIcon(  // Using FontAwesome GitHub icon
+                                child: FaIcon(
                                   FontAwesomeIcons.github,
                                   color: theme.colorScheme.primary,
                                   size: 24,
@@ -448,26 +448,6 @@ class _SetupScreenState extends State<SetupScreen> {
             ],
           ),
         ),
-      ),
-      bottomNavigationBar: NavigationBar(
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.water_drop_outlined),
-            selectedIcon: Icon(Icons.water_drop),
-            label: 'Tracker',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
-            label: 'Settings',
-          ),
-        ],
-        selectedIndex: 1,
-        onDestinationSelected: (index) {
-          if (index == 0) {
-            Navigator.pushReplacementNamed(context, '/');
-          }
-        },
       ),
     );
   }

@@ -1,10 +1,9 @@
-export 'package:flutter/material.dart';
-
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'screens/setup_screen.dart';
+import 'screens/statistics_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -38,6 +37,13 @@ class _MyAppState extends State<MyApp> {
     await prefs.setInt('themeMode', themeMode.index);
   }
 
+  void _handleThemeModeChanged(ThemeMode themeMode) {
+    setState(() {
+      _themeMode = themeMode;
+    });
+    _saveThemeMode(themeMode);
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -64,17 +70,7 @@ class _MyAppState extends State<MyApp> {
         useMaterial3: true,
       ),
       themeMode: _themeMode,
-      home: const MainScreen(),
-      routes: {
-        '/setup': (context) => SetupScreen(
-              onThemeModeChanged: (themeMode) {
-                setState(() {
-                  _themeMode = themeMode;
-                });
-                _saveThemeMode(themeMode);
-              },
-            ),
-      },
+      home: MainScreen(onThemeModeChanged: _handleThemeModeChanged),
     );
   }
 }
@@ -189,7 +185,9 @@ class _WaterButton extends StatelessWidget {
 }
 
 class MainScreen extends StatefulWidget {
-  const MainScreen({Key? key}) : super(key: key);
+  final ValueChanged<ThemeMode> onThemeModeChanged;
+
+  const MainScreen({Key? key, required this.onThemeModeChanged}) : super(key: key);
   
   @override
   State<MainScreen> createState() => _MainScreenState();
@@ -200,6 +198,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
   int _dailyWaterIntakeTarget = 2000;
   late AnimationController _controller;
   late Animation<double> _animation;
+  int _selectedIndex = 0;
 
   @override
   void initState() {
@@ -231,6 +230,12 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
 
     // Check if it's a new day
     if (today > lastUsedDate) {
+      // Save yesterday's data before resetting
+      final yesterday = DateTime.now().subtract(const Duration(days: 1));
+      final yesterdayKey = '${yesterday.year}-${yesterday.month}-${yesterday.day}';
+      final yesterdayIntake = prefs.getInt('dailyWaterIntake') ?? 0;
+      await prefs.setInt('water_$yesterdayKey', yesterdayIntake);
+      
       // Reset daily water intake if it's a new day
       await prefs.setInt('dailyWaterIntake', 0);
       await prefs.setInt('lastUsedDate', today);
@@ -253,143 +258,157 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
     await prefs.setInt('dailyWaterIntake', _dailyWaterIntake);
     await prefs.setInt('dailyWaterIntakeTarget', _dailyWaterIntakeTarget);
     
-    // Update last used date
+    // Save today's data for historical tracking
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day).millisecondsSinceEpoch;
-    await prefs.setInt('lastUsedDate', today);
+    final today = DateTime(now.year, now.month, now.day);
+    final todayKey = '${today.year}-${today.month}-${today.day}';
+    await prefs.setInt('water_$todayKey', _dailyWaterIntake);
+    
+    // Update last used date
+    await prefs.setInt('lastUsedDate', today.millisecondsSinceEpoch);
+  }
+
+  Widget _buildMainContent() {
+    final theme = Theme.of(context);
+    final progress = _dailyWaterIntake / _dailyWaterIntakeTarget;
+    
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            theme.colorScheme.primary.withOpacity(0.1),
+            theme.colorScheme.surface,
+          ],
+        ),
+      ),
+      child: SafeArea(
+        child: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              floating: true,
+              automaticallyImplyLeading: false,
+              title: Text(
+                'Water Tracker',
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              centerTitle: true,
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  children: [
+                    Text(
+                      'Daily Progress',
+                      style: GoogleFonts.poppins(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ).animate().fadeIn().slideY(),
+                    const SizedBox(height: 8),
+                    Text(
+                      '$_dailyWaterIntake ml',
+                      style: GoogleFonts.poppins(
+                        fontSize: 48,
+                        fontWeight: FontWeight.w700,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ).animate().fadeIn().scale(),
+                    const SizedBox(height: 32),
+                    AspectRatio(
+                      aspectRatio: 1,
+                      child: Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: AnimatedBuilder(
+                          animation: _animation,
+                          builder: (context, child) {
+                            return CustomPaint(
+                              painter: _WaterProgressPainter(
+                                progress: progress * _animation.value,
+                                color: theme.colorScheme.primary,
+                                backgroundColor: theme.colorScheme.surfaceVariant,
+                              ),
+                              child: Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      '${(progress * 100).toInt()}%',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 36,
+                                        fontWeight: FontWeight.bold,
+                                        color: theme.colorScheme.primary,
+                                      ),
+                                    ),
+                                    Text(
+                                      'of daily goal',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 14,
+                                        color: theme.colorScheme.primary.withOpacity(0.7),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ).animate().fadeIn(),
+                    const SizedBox(height: 40),
+                    Wrap(
+                      spacing: 16,
+                      runSpacing: 16,
+                      alignment: WrapAlignment.center,
+                      children: [
+                        _WaterButton(
+                          amount: 250,
+                          onTap: () {
+                            setState(() {
+                              _dailyWaterIntake += 250;
+                              _saveWaterIntakeData();
+                            });
+                            _controller.forward(from: 0);
+                          },
+                        ),
+                        _WaterButton(
+                          amount: 500,
+                          onTap: () {
+                            setState(() {
+                              _dailyWaterIntake += 500;
+                              _saveWaterIntakeData();
+                            });
+                            _controller.forward(from: 0);
+                          },
+                        ),
+                      ],
+                    ).animate().fadeIn().slideY(),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final progress = _dailyWaterIntake / _dailyWaterIntakeTarget;
+    final List<Widget> screens = [
+      _buildMainContent(),
+      const StatisticsScreen(),
+      SetupScreen(onThemeModeChanged: widget.onThemeModeChanged),
+    ];
     
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              theme.colorScheme.primary.withOpacity(0.1),
-              theme.colorScheme.surface,
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: CustomScrollView(
-            slivers: [
-              SliverAppBar(
-                floating: true,
-                automaticallyImplyLeading: false,
-                title: Text(
-                  'Water Tracker',
-                  style: GoogleFonts.poppins(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                centerTitle: true,
-                backgroundColor: Colors.transparent,
-                elevation: 0,
-              ),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.all(24.0),
-                  child: Column(
-                    children: [
-                      Text(
-                        'Daily Progress',
-                        style: GoogleFonts.poppins(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ).animate().fadeIn().slideY(),
-                      const SizedBox(height: 8),
-                      Text(
-                        '$_dailyWaterIntake ml',
-                        style: GoogleFonts.poppins(
-                          fontSize: 48,
-                          fontWeight: FontWeight.w700,
-                          color: theme.colorScheme.primary,
-                        ),
-                      ).animate().fadeIn().scale(),
-                      const SizedBox(height: 32),
-                      AspectRatio(
-                        aspectRatio: 1,
-                        child: Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: AnimatedBuilder(
-                            animation: _animation,
-                            builder: (context, child) {
-                              return CustomPaint(
-                                painter: _WaterProgressPainter(
-                                  progress: progress * _animation.value,
-                                  color: theme.colorScheme.primary,
-                                  backgroundColor: theme.colorScheme.surfaceVariant,
-                                ),
-                                child: Center(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        '${(progress * 100).toInt()}%',
-                                        style: GoogleFonts.poppins(
-                                          fontSize: 36,
-                                          fontWeight: FontWeight.bold,
-                                          color: theme.colorScheme.primary,
-                                        ),
-                                      ),
-                                      Text(
-                                        'of daily goal',
-                                        style: GoogleFonts.poppins(
-                                          fontSize: 14,
-                                          color: theme.colorScheme.primary.withOpacity(0.7),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ).animate().fadeIn(),
-                      const SizedBox(height: 40),
-                      Wrap(
-                        spacing: 16,
-                        runSpacing: 16,
-                        alignment: WrapAlignment.center,
-                        children: [
-                          _WaterButton(
-                            amount: 250,
-                            onTap: () {
-                              setState(() {
-                                _dailyWaterIntake += 250;
-                                _saveWaterIntakeData();
-                              });
-                              _controller.forward(from: 0);
-                            },
-                          ),
-                          _WaterButton(
-                            amount: 500,
-                            onTap: () {
-                              setState(() {
-                                _dailyWaterIntake += 500;
-                                _saveWaterIntakeData();
-                              });
-                              _controller.forward(from: 0);
-                            },
-                          ),
-                        ],
-                      ).animate().fadeIn().slideY(),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+      body: screens[_selectedIndex],
       bottomNavigationBar: NavigationBar(
         destinations: const [
           NavigationDestination(
@@ -398,16 +417,21 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
             label: 'Tracker',
           ),
           NavigationDestination(
+            icon: Icon(Icons.local_drink_outlined),
+            selectedIcon: Icon(Icons.local_drink),
+            label: 'Statistics',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.settings_outlined),
             selectedIcon: Icon(Icons.settings),
             label: 'Settings',
           ),
         ],
-        selectedIndex: 0,
+        selectedIndex: _selectedIndex,
         onDestinationSelected: (index) {
-          if (index == 1) {
-            Navigator.pushNamed(context, '/setup');
-          }
+          setState(() {
+            _selectedIndex = index;
+          });
         },
       ),
     );
