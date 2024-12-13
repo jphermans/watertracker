@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'screens/setup_screen.dart';
 import 'screens/statistics_screen.dart';
 
@@ -18,11 +19,42 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   ThemeMode _themeMode = ThemeMode.light;
+  final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
+      FlutterLocalNotificationsPlugin();
 
   @override
   void initState() {
     super.initState();
     _loadThemeMode();
+    _initializeNotifications();
+  }
+
+  Future<void> _initializeNotifications() async {
+    const AndroidInitializationSettings initializationSettingsAndroid =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+    final InitializationSettings initializationSettings =
+        InitializationSettings(android: initializationSettingsAndroid);
+    await _flutterLocalNotificationsPlugin.initialize(initializationSettings);
+  }
+
+  Future<void> _showNotification() async {
+    const AndroidNotificationDetails androidPlatformChannelSpecifics =
+        AndroidNotificationDetails(
+      'your_channel_id',
+      'your_channel_name',
+      'your_channel_description',
+      importance: Importance.max,
+      priority: Priority.high,
+      showWhen: false,
+    );
+    const NotificationDetails platformChannelSpecifics =
+        NotificationDetails(android: androidPlatformChannelSpecifics);
+    await _flutterLocalNotificationsPlugin.show(
+      0,
+      'Water Tracker',
+      'You haven\'t added a drink in the last hour. Stay hydrated!',
+      platformChannelSpecifics,
+    );
   }
 
   Future<void> _loadThemeMode() async {
@@ -86,9 +118,9 @@ class _WaterProgressPainter extends CustomPainter {
 
   Color _getColorForProgress(double progress) {
     // Define the colors for the gradient
-    const startColor = Colors.red;    // 0%
-    const endColor = Colors.green;    // 100%
-    
+    const startColor = Colors.red; // 0%
+    const endColor = Colors.green; // 100%
+
     // Interpolate between the colors based on the progress
     return Color.lerp(startColor, endColor, progress) ?? startColor;
   }
@@ -193,18 +225,21 @@ class _WaterButton extends StatelessWidget {
 class MainScreen extends StatefulWidget {
   final ValueChanged<ThemeMode> onThemeModeChanged;
 
-  const MainScreen({Key? key, required this.onThemeModeChanged}) : super(key: key);
-  
+  const MainScreen({Key? key, required this.onThemeModeChanged})
+      : super(key: key);
+
   @override
   State<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateMixin {
+class _MainScreenState extends State<MainScreen>
+    with SingleTickerProviderStateMixin {
   int _dailyWaterIntake = 0;
   int _dailyWaterIntakeTarget = 2000;
   late AnimationController _controller;
   late Animation<double> _animation;
   int _selectedIndex = 0;
+  DateTime _lastDrinkTime = DateTime.now();
 
   @override
   void initState() {
@@ -218,17 +253,20 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
       CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
     );
     _controller.forward();
+    _startHourlyCheck();
   }
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
+  void _startHourlyCheck() {
+    Timer.periodic(const Duration(hours: 1), (timer) {
+      if (DateTime.now().difference(_lastDrinkTime).inHours >= 1) {
+        _showNotification();
+      }
+    });
   }
 
   Future<void> _loadWaterIntakeData() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    
+
     // Get the current date
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day).millisecondsSinceEpoch;
@@ -238,10 +276,11 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
     if (today > lastUsedDate) {
       // Save yesterday's data before resetting
       final yesterday = DateTime.now().subtract(const Duration(days: 1));
-      final yesterdayKey = '${yesterday.year}-${yesterday.month}-${yesterday.day}';
+      final yesterdayKey =
+          '${yesterday.year}-${yesterday.month}-${yesterday.day}';
       final yesterdayIntake = prefs.getInt('dailyWaterIntake') ?? 0;
       await prefs.setInt('water_$yesterdayKey', yesterdayIntake);
-      
+
       // Reset daily water intake if it's a new day
       await prefs.setInt('dailyWaterIntake', 0);
       await prefs.setInt('lastUsedDate', today);
@@ -263,21 +302,31 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setInt('dailyWaterIntake', _dailyWaterIntake);
     await prefs.setInt('dailyWaterIntakeTarget', _dailyWaterIntakeTarget);
-    
+
     // Save today's data for historical tracking
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final todayKey = '${today.year}-${today.month}-${today.day}';
     await prefs.setInt('water_$todayKey', _dailyWaterIntake);
-    
+
     // Update last used date
     await prefs.setInt('lastUsedDate', today.millisecondsSinceEpoch);
   }
 
+  void _addDrink(int amount) {
+    setState(() {
+      _dailyWaterIntake += amount;
+      _lastDrinkTime = DateTime.now();
+      _saveWaterIntakeData();
+    });
+    _controller.forward(from: 0);
+  }
+
   Widget _buildMainContent() {
     final theme = Theme.of(context);
-    final progress = (_dailyWaterIntake / _dailyWaterIntakeTarget).clamp(0.0, 1.0);
-    
+    final progress =
+        (_dailyWaterIntake / _dailyWaterIntakeTarget).clamp(0.0, 1.0);
+
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -338,7 +387,8 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                             return CustomPaint(
                               painter: _WaterProgressPainter(
                                 progress: progress * _animation.value,
-                                backgroundColor: theme.colorScheme.surfaceVariant,
+                                backgroundColor:
+                                    theme.colorScheme.surfaceVariant,
                               ),
                               child: Center(
                                 child: Column(
@@ -356,7 +406,8 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                                       'of daily goal',
                                       style: GoogleFonts.poppins(
                                         fontSize: 14,
-                                        color: theme.colorScheme.primary.withOpacity(0.7),
+                                        color: theme.colorScheme.primary
+                                            .withOpacity(0.7),
                                       ),
                                     ),
                                   ],
@@ -375,23 +426,11 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                       children: [
                         _WaterButton(
                           amount: 250,
-                          onTap: () {
-                            setState(() {
-                              _dailyWaterIntake += 250;
-                              _saveWaterIntakeData();
-                            });
-                            _controller.forward(from: 0);
-                          },
+                          onTap: () => _addDrink(250),
                         ),
                         _WaterButton(
                           amount: 500,
-                          onTap: () {
-                            setState(() {
-                              _dailyWaterIntake += 500;
-                              _saveWaterIntakeData();
-                            });
-                            _controller.forward(from: 0);
-                          },
+                          onTap: () => _addDrink(500),
                         ),
                       ],
                     ).animate().fadeIn().slideY(),
@@ -412,7 +451,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
       const StatisticsScreen(),
       SetupScreen(onThemeModeChanged: widget.onThemeModeChanged),
     ];
-    
+
     return Scaffold(
       body: screens[_selectedIndex],
       bottomNavigationBar: NavigationBar(
