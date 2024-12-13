@@ -77,14 +77,21 @@ class _MyAppState extends State<MyApp> {
 
 class _WaterProgressPainter extends CustomPainter {
   final double progress;
-  final Color color;
   final Color backgroundColor;
 
   _WaterProgressPainter({
     required this.progress,
-    required this.color,
     required this.backgroundColor,
   });
+
+  Color _getColorForProgress(double progress) {
+    // Define the colors for the gradient
+    const startColor = Colors.red;    // 0%
+    const endColor = Colors.green;    // 100%
+    
+    // Interpolate between the colors based on the progress
+    return Color.lerp(startColor, endColor, progress) ?? startColor;
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -99,9 +106,9 @@ class _WaterProgressPainter extends CustomPainter {
       ..strokeWidth = strokeWidth;
     canvas.drawCircle(center, radius - strokeWidth / 2, backgroundPaint);
 
-    // Draw progress arc
+    // Draw progress arc with color based on progress
     final progressPaint = Paint()
-      ..color = color
+      ..color = _getColorForProgress(progress)
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round;
@@ -118,7 +125,6 @@ class _WaterProgressPainter extends CustomPainter {
   @override
   bool shouldRepaint(_WaterProgressPainter oldDelegate) {
     return oldDelegate.progress != progress ||
-        oldDelegate.color != color ||
         oldDelegate.backgroundColor != backgroundColor;
   }
 }
@@ -270,7 +276,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
 
   Widget _buildMainContent() {
     final theme = Theme.of(context);
-    final progress = _dailyWaterIntake / _dailyWaterIntakeTarget;
+    final progress = (_dailyWaterIntake / _dailyWaterIntakeTarget).clamp(0.0, 1.0);
     
     return Container(
       decoration: BoxDecoration(
@@ -331,7 +337,6 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                             return CustomPaint(
                               painter: _WaterProgressPainter(
                                 progress: progress * _animation.value,
-                                color: theme.colorScheme.primary,
                                 backgroundColor: theme.colorScheme.surfaceVariant,
                               ),
                               child: Center(

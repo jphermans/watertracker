@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 class SetupScreen extends StatefulWidget {
   const SetupScreen({Key? key, required this.onThemeModeChanged}) : super(key: key);
@@ -19,6 +20,7 @@ class _SetupScreenState extends State<SetupScreen> {
   late TextEditingController _targetController;
   String? _targetError;
   final Uri _githubUrl = Uri.parse('https://github.com/jphermans');
+  String _version = '';
 
   Future<void> _launchGithub() async {
     if (!await launchUrl(_githubUrl, mode: LaunchMode.externalApplication)) {
@@ -35,11 +37,21 @@ class _SetupScreenState extends State<SetupScreen> {
     }
   }
 
+  Future<void> _loadVersion() async {
+    final packageInfo = await PackageInfo.fromPlatform();
+    if (mounted) {
+      setState(() {
+        _version = packageInfo.version;
+      });
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _loadThemeMode();
     _loadDailyTarget();
+    _loadVersion();
     _targetController = TextEditingController();
   }
 
@@ -344,7 +356,7 @@ class _SetupScreenState extends State<SetupScreen> {
                                         ),
                                       ),
                                       Text(
-                                        'Version 1.0.0',
+                                        'Version $_version',
                                         style: GoogleFonts.poppins(
                                           fontSize: 14,
                                           color: theme.colorScheme.onSurface.withOpacity(0.7),

@@ -103,6 +103,18 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     );
   }
 
+  Color _getColorForPercentage(double percentage) {
+    // Convert percentage to a value between 0 and 1
+    final value = percentage / 100;
+    
+    // Define the colors for the gradient
+    const startColor = Colors.red;    // 0%
+    const endColor = Colors.green;    // 100%
+    
+    // Interpolate between the colors based on the value
+    return Color.lerp(startColor, endColor, value) ?? startColor;
+  }
+
   Widget _buildChartContent(
     List<double> data,
     List<String> labels,
@@ -110,120 +122,176 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     bool isMonthly,
     ThemeData theme,
   ) {
-    return LineChart(
-      LineChartData(
-        gridData: FlGridData(
-          show: true,
-          drawVerticalLine: false,
-          horizontalInterval: 20,
-          getDrawingHorizontalLine: (value) {
-            return FlLine(
-              color: theme.colorScheme.onSurface.withOpacity(0.15),
-              strokeWidth: 1,
-              dashArray: [5, 5],
-            );
-          },
-        ),
-        titlesData: FlTitlesData(
-          show: true,
-          rightTitles: const AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
+    final spots = data.asMap().entries.map((entry) {
+      final value = entry.value.abs().clamp(0.0, 100.0);
+      return FlSpot(entry.key.toDouble(), value);
+    }).toList();
+
+    final gradientColors = spots.map((spot) => _getColorForPercentage(spot.y)).toList();
+    final gradientStops = List<double>.generate(
+      spots.length,
+      (index) => index / (spots.length - 1),
+    );
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: LineChart(
+        LineChartData(
+          gridData: FlGridData(
+            show: true,
+            drawVerticalLine: false,
+            horizontalInterval: 1,
+            checkToShowHorizontalLine: (value) {
+              // Only show lines at specific percentages
+              return value == 0 || value == 20 || value == 40 || 
+                     value == 60 || value == 80 || value == 100;
+            },
+            getDrawingHorizontalLine: (value) {
+              if (value == 0 || value == 100) {
+                return FlLine(
+                  color: theme.colorScheme.onSurface.withOpacity(0.4),
+                  strokeWidth: 1,
+                );
+              }
+              return FlLine(
+                color: theme.colorScheme.onSurface.withOpacity(0.15),
+                strokeWidth: 1,
+                dashArray: [5, 5],
+              );
+            },
           ),
-          topTitles: const AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
-          ),
-          bottomTitles: AxisTitles(
-            axisNameSize: 30,
-            sideTitles: SideTitles(
-              showTitles: true,
-              interval: isMonthly ? 1 : 1,
-              reservedSize: 42,
-              getTitlesWidget: (value, meta) {
-                if (!isMonthly) {
+          titlesData: FlTitlesData(
+            show: true,
+            rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            bottomTitles: AxisTitles(
+              axisNameSize: 30,
+              sideTitles: SideTitles(
+                showTitles: true,
+                interval: isMonthly ? 1 : 1,
+                reservedSize: 42,
+                getTitlesWidget: (value, meta) {
+                  if (!isMonthly) {
+                    final now = DateTime.now();
+                    final date = now.subtract(Duration(days: 6 - value.toInt()));
+                    final dayName = _getDayName(date.weekday);
+                    
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: Text(
+                        dayName,
+                        style: GoogleFonts.poppins(
+                          fontSize: 14,
+                          color: theme.colorScheme.onSurface.withOpacity(0.7),
+                        ),
+                      ),
+                    );
+                  }
+                  
+                  final daysAgo = 30 - value.toInt();
                   return Padding(
                     padding: const EdgeInsets.only(top: 8.0),
                     child: Text(
-                      labels[value.toInt()],
+                      daysAgo.toString(),
                       style: GoogleFonts.poppins(
                         fontSize: 14,
                         color: theme.colorScheme.onSurface.withOpacity(0.7),
                       ),
                     ),
                   );
-                }
-                
-                final date = DateTime.now().subtract(Duration(days: 29 - value.toInt()));
-                return Padding(
-                  padding: const EdgeInsets.only(top: 8.0),
-                  child: RotatedBox(
-                    quarterTurns: 1,
+                },
+              ),
+            ),
+            leftTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                interval: 20,
+                reservedSize: 50,
+                getTitlesWidget: (value, meta) {
+                  String text;
+                  if (value == 0) {
+                    text = '0%';
+                  } else if (value >= 99.9) {
+                    text = '100%';
+                  } else if (value % 20 == 0) {
+                    text = '${value.toInt()}%';
+                  } else {
+                    return const SizedBox.shrink();
+                  }
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
                     child: Text(
-                      '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}',
+                      text,
                       style: GoogleFonts.poppins(
                         fontSize: 14,
                         color: theme.colorScheme.onSurface.withOpacity(0.7),
                       ),
                     ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
           ),
-          leftTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              interval: 20,
-              reservedSize: 50,
-              getTitlesWidget: (value, meta) {
-                if (value == 0) return const SizedBox.shrink();
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Text(
-                    '${value.toInt()}%',
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      color: theme.colorScheme.onSurface.withOpacity(0.7),
-                    ),
-                  ),
-                );
-              },
+          borderData: FlBorderData(show: false),
+          minX: -0.5,
+          maxX: maxX + 0.5,
+          minY: -2,
+          maxY: 102,
+          clipData: FlClipData.none(),
+          lineBarsData: [
+            LineChartBarData(
+              spots: spots,
+              isCurved: false,
+              gradient: LinearGradient(
+                colors: gradientColors,
+                stops: gradientStops,
+              ),
+              barWidth: 3,
+              isStrokeCapRound: true,
+              dotData: FlDotData(
+                show: true,
+                getDotPainter: (spot, percent, barData, index) {
+                  final color = _getColorForPercentage(spot.y);
+                  return FlDotCirclePainter(
+                    radius: 6,
+                    color: theme.colorScheme.surface,
+                    strokeWidth: 3,
+                    strokeColor: color,
+                  );
+                },
+              ),
+              belowBarData: BarAreaData(show: false),
             ),
-          ),
+          ],
+          lineTouchData: LineTouchData(enabled: false),
         ),
-        borderData: FlBorderData(show: false),
-        minX: -0.5,
-        maxX: maxX + 0.5,
-        minY: 0,
-        maxY: 100,
-        clipData: FlClipData.none(),
-        lineBarsData: [
-          LineChartBarData(
-            spots: data.asMap().entries.map((entry) {
-              final value = entry.value.abs().clamp(0.0, 100.0);
-              return FlSpot(entry.key.toDouble(), value);
-            }).toList(),
-            isCurved: true,
-            curveSmoothness: 0.3,
-            color: theme.colorScheme.primary,
-            barWidth: 3,
-            isStrokeCapRound: true,
-            dotData: FlDotData(
-              show: true,
-              getDotPainter: (spot, percent, barData, index) {
-                return FlDotCirclePainter(
-                  radius: 6,
-                  color: theme.colorScheme.surface,
-                  strokeWidth: 3,
-                  strokeColor: theme.colorScheme.primary,
-                );
-              },
-            ),
-            belowBarData: BarAreaData(show: false),
-          ),
-        ],
-        lineTouchData: LineTouchData(enabled: false),
       ),
     );
+  }
+
+  String _getDayName(int weekday) {
+    switch (weekday) {
+      case DateTime.monday:
+        return 'Mon';
+      case DateTime.tuesday:
+        return 'Tue';
+      case DateTime.wednesday:
+        return 'Wed';
+      case DateTime.thursday:
+        return 'Thu';
+      case DateTime.friday:
+        return 'Fri';
+      case DateTime.saturday:
+        return 'Sat';
+      case DateTime.sunday:
+        return 'Sun';
+      default:
+        return '';
+    }
   }
 
   @override
@@ -274,7 +342,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                               aspectRatio: 1.2,
                               child: _buildChart(
                                 data: weeklyData,
-                                labels: const ['Thu', 'Wed', 'Tue', 'Mon', 'Sun', 'Sat', 'Fri'],
+                                labels: const [],
                                 maxX: 6,
                               ),
                             ),
