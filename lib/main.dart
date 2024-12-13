@@ -1,3 +1,5 @@
+export 'package:flutter/material.dart';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -221,8 +223,27 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
 
   Future<void> _loadWaterIntakeData() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
+    
+    // Get the current date
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day).millisecondsSinceEpoch;
+    final lastUsedDate = prefs.getInt('lastUsedDate') ?? today;
+
+    // Check if it's a new day
+    if (today > lastUsedDate) {
+      // Reset daily water intake if it's a new day
+      await prefs.setInt('dailyWaterIntake', 0);
+      await prefs.setInt('lastUsedDate', today);
+      setState(() {
+        _dailyWaterIntake = 0;
+      });
+    } else {
+      setState(() {
+        _dailyWaterIntake = prefs.getInt('dailyWaterIntake') ?? 0;
+      });
+    }
+
     setState(() {
-      _dailyWaterIntake = prefs.getInt('dailyWaterIntake') ?? 0;
       _dailyWaterIntakeTarget = prefs.getInt('dailyWaterIntakeTarget') ?? 2000;
     });
   }
@@ -230,7 +251,12 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
   Future<void> _saveWaterIntakeData() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setInt('dailyWaterIntake', _dailyWaterIntake);
-    await prefs.setInt('dailyWaterIntakeTarget', _dailyWaterIntakeTarget);  
+    await prefs.setInt('dailyWaterIntakeTarget', _dailyWaterIntakeTarget);
+    
+    // Update last used date
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day).millisecondsSinceEpoch;
+    await prefs.setInt('lastUsedDate', today);
   }
 
   @override
