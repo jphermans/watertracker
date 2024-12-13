@@ -212,26 +212,24 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                 interval: 20,
                 reservedSize: 50,
                 getTitlesWidget: (value, meta) {
-                  String text;
-                  if (value == 0) {
-                    text = '0%';
-                  } else if (value >= 99.9) {
-                    text = '100%';
-                  } else if (value % 20 == 0) {
-                    text = '${value.toInt()}%';
-                  } else {
+                  // Don't show 100% label
+                  if (value >= 99.9) {
                     return const SizedBox.shrink();
                   }
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: Text(
-                      text,
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        color: theme.colorScheme.onSurface.withOpacity(0.7),
+                  // Show other labels
+                  if (value == 0 || value % 20 == 0) {
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: Text(
+                        '${value.toInt()}%',
+                        style: GoogleFonts.poppins(
+                          fontSize: 14,
+                          color: theme.colorScheme.onSurface.withOpacity(0.7),
+                        ),
                       ),
-                    ),
-                  );
+                    );
+                  }
+                  return const SizedBox.shrink();
                 },
               ),
             ),

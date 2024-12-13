@@ -2,7 +2,7 @@ name: watertracker
 description: "A new Flutter watertracker app."
 publish_to: 'none'
 
-version: 1.0.5+1
+version: 1.0.6+1
 
 environment:
   sdk: ^3.5.3

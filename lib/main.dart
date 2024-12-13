@@ -298,6 +298,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
               title: Text(
                 'Water Tracker',
                 style: GoogleFonts.poppins(
+                  fontSize: 22,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -313,7 +314,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                     Text(
                       'Daily Progress',
                       style: GoogleFonts.poppins(
-                        fontSize: 24,
+                        fontSize: 18,
                         fontWeight: FontWeight.w600,
                       ),
                     ).animate().fadeIn().slideY(),
@@ -321,7 +322,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                     Text(
                       '$_dailyWaterIntake ml',
                       style: GoogleFonts.poppins(
-                        fontSize: 48,
+                        fontSize: 38,
                         fontWeight: FontWeight.w700,
                         color: theme.colorScheme.primary,
                       ),
@@ -346,7 +347,7 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                                     Text(
                                       '${(progress * 100).toInt()}%',
                                       style: GoogleFonts.poppins(
-                                        fontSize: 36,
+                                        fontSize: 40,
                                         fontWeight: FontWeight.bold,
                                         color: theme.colorScheme.primary,
                                       ),
