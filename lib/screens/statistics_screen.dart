@@ -4,7 +4,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class StatisticsScreen extends StatefulWidget {
-  const StatisticsScreen({Key? key}) : super(key: key);
+  const StatisticsScreen({super.key});
 
   @override
   State<StatisticsScreen> createState() => _StatisticsScreenState();
@@ -30,9 +30,16 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     super.dispose();
   }
 
-  double _calculatePercentage(int intake, int target) {
+  double _calculatePercentage(int intake, int target,
+      {bool isWeekly = false, bool isMonthly = false}) {
     if (target <= 0) return 0.0;
-    return (intake / target * 100).clamp(0.0, 100.0);
+    int adjustedTarget = target;
+    if (isWeekly) {
+      adjustedTarget = target * 7;
+    } else if (isMonthly) {
+      adjustedTarget = target * 30;
+    }
+    return (intake / adjustedTarget * 100).clamp(0.0, 100.0);
   }
 
   Future<void> _loadStatistics() async {
@@ -47,7 +54,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       final date = now.subtract(Duration(days: i));
       final dateKey = '${date.year}-${date.month}-${date.day}';
       final intake = prefs.getInt('water_$dateKey') ?? 0;
-      weeklyData[6 - i] = _calculatePercentage(intake.abs(), _dailyTarget);
+      weeklyData[6 - i] =
+          _calculatePercentage(intake.abs(), _dailyTarget, isWeekly: true);
     }
 
     // Load monthly data
@@ -55,7 +63,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       final date = now.subtract(Duration(days: i));
       final dateKey = '${date.year}-${date.month}-${date.day}';
       final intake = prefs.getInt('water_$dateKey') ?? 0;
-      monthlyData[29 - i] = _calculatePercentage(intake.abs(), _dailyTarget);
+      monthlyData[29 - i] =
+          _calculatePercentage(intake.abs(), _dailyTarget, isMonthly: true);
       _totalMonthlyIntake += intake.abs();
     }
 
@@ -83,7 +92,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     bool isMonthly = false,
   }) {
     final theme = Theme.of(context);
-    
+
     return Container(
       decoration: BoxDecoration(
         color: theme.colorScheme.surface.withOpacity(0.1),
@@ -106,11 +115,11 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   Color _getColorForPercentage(double percentage) {
     // Convert percentage to a value between 0 and 1
     final value = percentage / 100;
-    
+
     // Define the colors for the gradient
-    const startColor = Colors.red;    // 0%
-    const endColor = Colors.green;    // 100%
-    
+    const startColor = Colors.red; // 0%
+    const endColor = Colors.green; // 100%
+
     // Interpolate between the colors based on the value
     return Color.lerp(startColor, endColor, value) ?? startColor;
   }
@@ -127,7 +136,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       return FlSpot(entry.key.toDouble(), value);
     }).toList();
 
-    final gradientColors = spots.map((spot) => _getColorForPercentage(spot.y)).toList();
+    final gradientColors =
+        spots.map((spot) => _getColorForPercentage(spot.y)).toList();
     final gradientStops = List<double>.generate(
       spots.length,
       (index) => index / (spots.length - 1),
@@ -143,8 +153,12 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
             horizontalInterval: 1,
             checkToShowHorizontalLine: (value) {
               // Only show lines at specific percentages
-              return value == 0 || value == 20 || value == 40 || 
-                     value == 60 || value == 80 || value == 100;
+              return value == 0 ||
+                  value == 20 ||
+                  value == 40 ||
+                  value == 60 ||
+                  value == 80 ||
+                  value == 100;
             },
             getDrawingHorizontalLine: (value) {
               if (value == 0 || value == 100) {
@@ -177,9 +191,10 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                 getTitlesWidget: (value, meta) {
                   if (!isMonthly) {
                     final now = DateTime.now();
-                    final date = now.subtract(Duration(days: 6 - value.toInt()));
+                    final date =
+                        now.subtract(Duration(days: 6 - value.toInt()));
                     final dayName = _getDayName(date.weekday);
-                    
+
                     return Padding(
                       padding: const EdgeInsets.only(top: 8.0),
                       child: Text(
@@ -191,7 +206,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                       ),
                     );
                   }
-                  
+
                   final daysAgo = 30 - value.toInt();
                   return Padding(
                     padding: const EdgeInsets.only(top: 8.0),
@@ -239,7 +254,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
           maxX: maxX + 0.5,
           minY: -2,
           maxY: 102,
-          clipData: FlClipData.none(),
+          clipData: const FlClipData.none(),
           lineBarsData: [
             LineChartBarData(
               spots: spots,
@@ -265,7 +280,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
               belowBarData: BarAreaData(show: false),
             ),
           ],
-          lineTouchData: LineTouchData(enabled: false),
+          lineTouchData: const LineTouchData(enabled: false),
         ),
       ),
     );
@@ -295,7 +310,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
@@ -332,7 +347,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                               'Daily progress as percentage of target',
                               style: GoogleFonts.poppins(
                                 fontSize: 16,
-                                color: theme.colorScheme.onSurface.withOpacity(0.7),
+                                color: theme.colorScheme.onSurface
+                                    .withOpacity(0.7),
                               ),
                             ),
                             const SizedBox(height: 20),
@@ -362,16 +378,19 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                                       'Progress over the last 30 days',
                                       style: GoogleFonts.poppins(
                                         fontSize: 16,
-                                        color: theme.colorScheme.onSurface.withOpacity(0.7),
+                                        color: theme.colorScheme.onSurface
+                                            .withOpacity(0.7),
                                       ),
                                     ),
                                   ],
                                 ),
                                 const Spacer(),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 16, vertical: 8),
                                   decoration: BoxDecoration(
-                                    color: theme.colorScheme.surface.withOpacity(0.1),
+                                    color: theme.colorScheme.surface
+                                        .withOpacity(0.1),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: Row(

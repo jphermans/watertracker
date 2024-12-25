@@ -7,7 +7,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 class SetupScreen extends StatefulWidget {
-  const SetupScreen({Key? key, required this.onThemeModeChanged}) : super(key: key);
+  const SetupScreen({super.key, required this.onThemeModeChanged});
 
   final ValueChanged<ThemeMode> onThemeModeChanged;
 

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -11,7 +12,7 @@ void main() {
 }
 
 class MyApp extends StatefulWidget {
-  const MyApp({Key? key}) : super(key: key);
+  const MyApp({super.key});
 
   @override
   State<MyApp> createState() => _MyAppState();
@@ -32,28 +33,21 @@ class _MyAppState extends State<MyApp> {
   Future<void> _initializeNotifications() async {
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
-    final InitializationSettings initializationSettings =
-        InitializationSettings(android: initializationSettingsAndroid);
-    await _flutterLocalNotificationsPlugin.initialize(initializationSettings);
-  }
 
-  Future<void> _showNotification() async {
-    const AndroidNotificationDetails androidPlatformChannelSpecifics =
-        AndroidNotificationDetails(
-      'your_channel_id',
-      'your_channel_name',
-      'your_channel_description',
-      importance: Importance.max,
-      priority: Priority.high,
-      showWhen: false,
+    const DarwinInitializationSettings initializationSettingsIOS =
+        DarwinInitializationSettings();
+
+    const InitializationSettings initializationSettings =
+        InitializationSettings(
+      android: initializationSettingsAndroid,
+      iOS: initializationSettingsIOS,
     );
-    const NotificationDetails platformChannelSpecifics =
-        NotificationDetails(android: androidPlatformChannelSpecifics);
-    await _flutterLocalNotificationsPlugin.show(
-      0,
-      'Water Tracker',
-      'You haven\'t added a drink in the last hour. Stay hydrated!',
-      platformChannelSpecifics,
+
+    await _flutterLocalNotificationsPlugin.initialize(
+      initializationSettings,
+      onDidReceiveNotificationResponse: (NotificationResponse details) {
+        // Handle notification tapped logic here
+      },
     );
   }
 
@@ -76,6 +70,12 @@ class _MyAppState extends State<MyApp> {
     _saveThemeMode(themeMode);
   }
 
+  /// Builds the MaterialApp for the Water Tracker application, configuring the theme, theme mode, and home screen.
+  ///
+  /// The `build` method returns a `MaterialApp` widget that sets the application's title, theme, dark theme, and theme mode. It also sets the home screen to the `MainScreen` widget, passing the `_handleThemeModeChanged` callback to allow the home screen to update the theme mode.
+  /// Builds the MaterialApp for the Water Tracker application, configuring the theme, theme mode, and home screen.
+  ///
+  /// The `build` method returns a `MaterialApp` widget that sets the application's title, theme, dark theme, and theme mode. It also sets the home screen to the `MainScreen` widget, passing the `_handleThemeModeChanged` callback to allow the home screen to update the theme mode.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -225,8 +225,7 @@ class _WaterButton extends StatelessWidget {
 class MainScreen extends StatefulWidget {
   final ValueChanged<ThemeMode> onThemeModeChanged;
 
-  const MainScreen({Key? key, required this.onThemeModeChanged})
-      : super(key: key);
+  const MainScreen({super.key, required this.onThemeModeChanged});
 
   @override
   State<MainScreen> createState() => _MainScreenState();
@@ -240,6 +239,8 @@ class _MainScreenState extends State<MainScreen>
   late Animation<double> _animation;
   int _selectedIndex = 0;
   DateTime _lastDrinkTime = DateTime.now();
+  final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
+      FlutterLocalNotificationsPlugin();
 
   @override
   void initState() {
@@ -254,6 +255,28 @@ class _MainScreenState extends State<MainScreen>
     );
     _controller.forward();
     _startHourlyCheck();
+    _initializeNotifications();
+  }
+
+  Future<void> _initializeNotifications() async {
+    const AndroidInitializationSettings initializationSettingsAndroid =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+
+    const DarwinInitializationSettings initializationSettingsIOS =
+        DarwinInitializationSettings();
+
+    const InitializationSettings initializationSettings =
+        InitializationSettings(
+      android: initializationSettingsAndroid,
+      iOS: initializationSettingsIOS,
+    );
+
+    await _flutterLocalNotificationsPlugin.initialize(
+      initializationSettings,
+      onDidReceiveNotificationResponse: (NotificationResponse details) {
+        // Handle notification tapped logic here
+      },
+    );
   }
 
   void _startHourlyCheck() {
@@ -322,6 +345,26 @@ class _MainScreenState extends State<MainScreen>
     _controller.forward(from: 0);
   }
 
+  Future<void> _showNotification() async {
+    const AndroidNotificationDetails androidPlatformChannelSpecifics =
+        AndroidNotificationDetails(
+      'your_channel_id',
+      'your_channel_name',
+      channelDescription: 'your_channel_description',
+      importance: Importance.max,
+      priority: Priority.high,
+      showWhen: false,
+    );
+    const NotificationDetails platformChannelSpecifics =
+        NotificationDetails(android: androidPlatformChannelSpecifics);
+    await _flutterLocalNotificationsPlugin.show(
+      0,
+      'Water Tracker',
+      'You haven\'t added a drink in the last hour. Stay hydrated!',
+      platformChannelSpecifics,
+    );
+  }
+
   Widget _buildMainContent() {
     final theme = Theme.of(context);
     final progress =
@@ -388,7 +431,7 @@ class _MainScreenState extends State<MainScreen>
                               painter: _WaterProgressPainter(
                                 progress: progress * _animation.value,
                                 backgroundColor:
-                                    theme.colorScheme.surfaceVariant,
+                                    theme.colorScheme.surfaceContainerHighest,
                               ),
                               child: Center(
                                 child: Column(

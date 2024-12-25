@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "org.jphsystems.watertracker"
+    namespace = "com.jphsystems.watertracker"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
